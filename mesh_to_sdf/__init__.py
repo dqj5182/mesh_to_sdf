@@ -45,7 +45,6 @@ def mesh_to_voxels(mesh, voxel_resolution=64, surface_point_method='scan', sign_
     mesh = scale_to_unit_cube(mesh)
 
     surface_point_cloud = get_surface_point_cloud(mesh, surface_point_method, 3**0.5, scan_count, scan_resolution, sample_point_count, sign_method=='normal')
-
     return surface_point_cloud.get_voxels(voxel_resolution, sign_method=='depth', normal_sample_count, pad, check_result, return_gradients)
 
 # Sample some uniform points and some normally distributed around the surface as proposed in the DeepSDF paper

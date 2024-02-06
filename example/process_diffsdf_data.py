@@ -5,6 +5,7 @@ import csv
 import json
 import h5py
 import trimesh
+import subprocess
 import numpy as np
 from mesh_to_sdf import sample_sdf_near_surface, mesh_to_voxels, mesh_to_sdf
 from mesh_to_sdf.utils import scale_to_unit_sphere
@@ -32,16 +33,40 @@ def save_obj_with_color(v, f=None, c=None, file_name=''):
     obj_file.close()
 
 
+def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simplel_acronym_watertight_path):
+    for each_h5_file in os.listdir(acronym_dataset_path):
+        grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
+        _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
+        obj_file_name = obj_file_path.split('.obj')[0]
+        print(f'Processing {obj_file_name}....')
+        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+        out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
+        subprocess.call(["externals/Manifold/build/manifold", full_obj_file_path, out_file_path, "-s"])
+    for each_h5_file in os.listdir(acronym_dataset_path):
+        grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
+        _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
+        obj_file_name = obj_file_path.split('.obj')[0]
+        print(f'Processing {obj_file_name}....')
+        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+        out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
+        out_simple_file_path = os.path.join(simplel_acronym_watertight_path, obj_file_path)
+        subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
+
+
 def load_acronym_dataset(shapenetsem_path):
     # returns list of trimesh files for Acronym objects
     acronym_mesh_list = []
     for each_h5_file in os.listdir(acronym_dataset_path):
         grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
         _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
+        obj_file_name = obj_file_path.split('.obj')[0]
+        print(f'Processing {obj_file_name}....')
         obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
         each_h5_mesh = trimesh.load(obj_file_path, force='mesh')
+        # # Visualize
         # save_obj_with_color(v=each_h5_mesh.vertices, f=each_h5_mesh.faces, c=None, file_name='debug_mesh_h5.obj')
         acronym_mesh_list.append(each_h5_mesh)
+        import pdb; pdb.set_trace()
     return acronym_mesh_list
 
 
@@ -50,6 +75,10 @@ if target_dataset == 'Acronym':
     # Load Acronym dataset
     print("Loading Acronym dataset....")
     shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
+    acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight'
+    simplel_acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight_simplified'
+    print("Creating Acronym dataset....")
+    create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simplel_acronym_watertight_path)
     acronym_mesh_list = load_acronym_dataset(shapenetsem_path)
     target_mesh_list = acronym_mesh_list
 elif target_dataset == 'debug':

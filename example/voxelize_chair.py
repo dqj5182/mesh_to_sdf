@@ -19,11 +19,10 @@ for i, scan in enumerate(cloud.scans):
 
 print("Voxelizing...")
 voxels = cloud.get_voxels(128, use_depth_buffer=True) # This is an N ✕ N ✕ N array of SDF values. [128, 128, 128]
-
+import pdb; pdb.set_trace()
 
 ############### Below is for visualization ###############
 print("Creating a mesh using Marching Cubes...")
 vertices, faces, normals, _ = skimage.measure.marching_cubes(voxels, level=0)
 mesh = trimesh.Trimesh(vertices=vertices, faces=faces, vertex_normals=normals)
 # mesh.show()
-import pdb; pdb.set_trace()

@@ -15,8 +15,9 @@ sdf_data_path = 'diffsdf_data/acronym/Couch/37cfcafe606611d81246538126da07a8/sdf
 grid_gt_path = 'diffsdf_data/grid_data/acronym/Couch/37cfcafe606611d81246538126da07a8/grid_gt.csv'
 splits_path = 'diffsdf_data/splits/couch_all.json'
 target_obj_path = 'example/chair.obj'
-target_dataset = 'ShapeNetSem' # 'ShapeNetSem', 'Acronym', 'debug'
+target_dataset = 'Acronym' # 'ShapeNetSem', 'Acronym', 'debug'
 acronym_dataset_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym/grasps'
+create_watertight = False
 # save_path = ''
 
 
@@ -73,43 +74,65 @@ def load_acronym_dataset(shapenetsem_path):
     # returns list of trimesh files for Acronym objects
     acronym_mesh_list = []
     for each_h5_file in os.listdir(acronym_dataset_path):
+    # for each_h5_file in [os.listdir(acronym_dataset_path)[0]]:
         grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
         _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
         obj_file_name = obj_file_path.split('.obj')[0]
         print(f'Processing {obj_file_name}....')
-        obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
-        each_h5_mesh = trimesh.load(obj_file_path, force='mesh')
+        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+        watertight_obj_file_path = os.path.join('acronym-watertight', obj_file_path)
+        # print('Caution!!! We are currently handling non-simplified watertight meshes!!!')
+        each_h5_mesh = trimesh.load(watertight_obj_file_path, force='mesh')
         # # Visualize
         # save_obj_with_color(v=each_h5_mesh.vertices, f=each_h5_mesh.faces, c=None, file_name='debug_mesh_h5.obj')
-        acronym_mesh_list.append(each_h5_mesh)
+        acronym_mesh_list.append({'obj_name': obj_name, 'obj_file_name': obj_file_name, 'mesh': each_h5_mesh})
     return acronym_mesh_list
+
+
+# Initialze path for dataset
+if target_dataset == 'Acronym':
+    shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
+    acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight'
+    simple_acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight_simplified'
+elif target_dataset == 'ShapeNetSem':
+    shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
+    shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight'
+    simple_shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight_simplified'
+elif target_dataset == 'debug':
+    pass
+else:
+    raise AttributeError('Not implemented!!!')
+
+
+# Create watertight mesh from dataset
+if create_watertight is True:
+    if target_dataset == 'Acronym':
+        print("Creating watertight dataset....")
+        create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_acronym_watertight_path)
+    elif target_dataset == 'ShapeNetSem':
+        print("Creating watertight dataset....")
+        create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path)
+    elif target_dataset == 'debug':
+        pass
+    else:
+        raise AttributeError('Not implemented!!!')
 
 
 # Choose target dataset
 if target_dataset == 'Acronym':
     # Load Acronym dataset
     print("Loading Acronym dataset....")
-    shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
-    acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight'
-    simple_acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight_simplified'
-    print("Creating Acronym dataset....")
-    create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_acronym_watertight_path)
     acronym_mesh_list = load_acronym_dataset(shapenetsem_path)
     target_mesh_list = acronym_mesh_list
 elif target_dataset == 'ShapeNetSem':
     # Load Acronym dataset
     print("Loading Acronym dataset....")
-    shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
-    shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight'
-    simple_shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight_simplified'
-    print("Creating Acronym dataset....")
-    create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path)
-    import pdb; pdb.set_trace()
-    acronym_mesh_list = load_acronym_dataset(shapenetsem_path)
-    target_mesh_list = acronym_mesh_list
+    # shapenetsem_mesh_list = load_shapenetsem_dataset(shapenetsem_path)
+    # target_mesh_list = shapenetsem_mesh_list
 elif target_dataset == 'debug':
     mesh = trimesh.load(target_obj_path)
-    target_mesh_list = [mesh]
+    mesh_name = 'chair'
+    target_mesh_list = [{'obj_name': mesh_name, 'obj_file_name': target_obj_path.split('example/')[-1].split('.obj')[0], 'mesh': mesh}] #[mesh]
 else:
     raise AttributeError('Not implemented!!!')
 
@@ -127,11 +150,16 @@ with open(splits_path) as f:
     splits = json.load(f)
 
 
-for each_target_mesh in target_mesh_list:
+for each_target_mesh_dict in target_mesh_list:
     # Extract sdf_data
     print("Extracting SDFs from our own datasets....")
-    mesh = each_target_mesh
-    ext_points, ext_sdf = sample_sdf_near_surface(mesh, number_of_points=len(sdf_data)) # points: [596000, 3], sdf: [596000]
+    obj_name = each_target_mesh_dict['obj_name']
+    each_target_mesh_name = each_target_mesh_dict['obj_file_name']
+    mesh = each_target_mesh_dict['mesh']
+    try:
+        ext_points, ext_sdf = sample_sdf_near_surface(mesh, number_of_points=len(sdf_data)) # points: [596000, 3], sdf: [596000]
+    except ValueError: # array with 0 samples
+        continue
     ext_sdf_data = np.concatenate([ext_points, ext_sdf[:, None]], axis=-1)
     ext_voxels = mesh_to_voxels(mesh, 128, pad=False, sign_method='normal') ####### Changed from pad=True to pad=False
 
@@ -153,12 +181,18 @@ for each_target_mesh in target_mesh_list:
     grid_gt_colors[ext_grid_gt_sdf < 0, 2] = 1
     grid_gt_colors[ext_grid_gt_sdf > 0, 0] = 1
 
-    save_obj_with_color(v=mesh.vertices, f=mesh.faces, c=None, file_name='debug_mesh.obj')
-    save_obj_with_color(v=ext_points, f=None, c=sdf_data_colors, file_name='debug_pc.obj')
-    save_obj_with_color(v=grod_gt_coords, f=None, c=None, file_name='debug_grid_gt.obj')
-    save_obj_with_color(v=grid_gt_query_points, f=None, c=grid_gt_colors, file_name='debug_ext_grid_gt.obj')
-    save_obj_with_color(v=filtered_grid_gt_query_points, f=None, c=None, file_name='debug_ext_grid_gt_filter.obj')
+    # # Visualization
+    # save_obj_with_color(v=mesh.vertices, f=mesh.faces, c=None, file_name='debug_mesh.obj')
+    # save_obj_with_color(v=ext_points, f=None, c=sdf_data_colors, file_name='debug_pc.obj')
+    # save_obj_with_color(v=grod_gt_coords, f=None, c=None, file_name='debug_grid_gt.obj')
+    # save_obj_with_color(v=grid_gt_query_points, f=None, c=grid_gt_colors, file_name='debug_ext_grid_gt.obj')
+    # save_obj_with_color(v=filtered_grid_gt_query_points, f=None, c=None, file_name='debug_ext_grid_gt_filter.obj')
 
 
     # Save
-    import pdb; pdb.set_trace()
+    if not os.path.exists(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name)):
+        os.makedirs(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name))
+    if not os.path.exists(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name)):
+        os.makedirs(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name))
+    np.savetxt(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name, "sdf_data.csv"), ext_sdf_data, delimiter=",")
+    np.savetxt(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name, "grid_gt.csv"), ext_grid_gt, delimiter=",")

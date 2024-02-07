@@ -15,7 +15,7 @@ sdf_data_path = 'diffsdf_data/acronym/Couch/37cfcafe606611d81246538126da07a8/sdf
 grid_gt_path = 'diffsdf_data/grid_data/acronym/Couch/37cfcafe606611d81246538126da07a8/grid_gt.csv'
 splits_path = 'diffsdf_data/splits/couch_all.json'
 target_obj_path = 'example/chair.obj'
-target_dataset = 'Acronym' # 'Acronym', 'debug'
+target_dataset = 'ShapeNetSem' # 'ShapeNetSem', 'Acronym', 'debug'
 acronym_dataset_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym/grasps'
 # save_path = ''
 
@@ -33,7 +33,7 @@ def save_obj_with_color(v, f=None, c=None, file_name=''):
     obj_file.close()
 
 
-def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simplel_acronym_watertight_path):
+def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_acronym_watertight_path):
     for each_h5_file in os.listdir(acronym_dataset_path):
         grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
         _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
@@ -49,7 +49,23 @@ def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simplel
         print(f'Processing {obj_file_name}....')
         full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
         out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
-        out_simple_file_path = os.path.join(simplel_acronym_watertight_path, obj_file_path)
+        out_simple_file_path = os.path.join(simple_acronym_watertight_path, obj_file_path)
+        subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
+
+
+def create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path):
+    for obj_file_path in [f for f in os.listdir(shapenetsem_path) if '.obj' in f]:
+        obj_file_name = obj_file_path.split('.obj')[0]
+        print(f'Processing {obj_file_name}....')
+        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+        out_file_path = os.path.join(shapenet_watertight_path, obj_file_path)
+        subprocess.call(["externals/Manifold/build/manifold", full_obj_file_path, out_file_path, "-s"])
+    for obj_file_path in [f for f in os.listdir(shapenetsem_path) if '.obj' in f]:
+        obj_file_name = obj_file_path.split('.obj')[0]
+        print(f'Processing {obj_file_name}....')
+        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+        out_file_path = os.path.join(shapenet_watertight_path, obj_file_path)
+        out_simple_file_path = os.path.join(simple_shapenet_watertight_path, obj_file_path)
         subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
 
 
@@ -66,7 +82,6 @@ def load_acronym_dataset(shapenetsem_path):
         # # Visualize
         # save_obj_with_color(v=each_h5_mesh.vertices, f=each_h5_mesh.faces, c=None, file_name='debug_mesh_h5.obj')
         acronym_mesh_list.append(each_h5_mesh)
-        import pdb; pdb.set_trace()
     return acronym_mesh_list
 
 
@@ -76,9 +91,20 @@ if target_dataset == 'Acronym':
     print("Loading Acronym dataset....")
     shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
     acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight'
-    simplel_acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight_simplified'
+    simple_acronym_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym-watertight_simplified'
     print("Creating Acronym dataset....")
-    create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simplel_acronym_watertight_path)
+    create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_acronym_watertight_path)
+    acronym_mesh_list = load_acronym_dataset(shapenetsem_path)
+    target_mesh_list = acronym_mesh_list
+elif target_dataset == 'ShapeNetSem':
+    # Load Acronym dataset
+    print("Loading Acronym dataset....")
+    shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
+    shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight'
+    simple_shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight_simplified'
+    print("Creating Acronym dataset....")
+    create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path)
+    import pdb; pdb.set_trace()
     acronym_mesh_list = load_acronym_dataset(shapenetsem_path)
     target_mesh_list = acronym_mesh_list
 elif target_dataset == 'debug':

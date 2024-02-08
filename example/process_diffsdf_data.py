@@ -7,6 +7,7 @@ import h5py
 import trimesh
 import subprocess
 import numpy as np
+import pandas as pd 
 from mesh_to_sdf import sample_sdf_near_surface, mesh_to_voxels, mesh_to_sdf
 from mesh_to_sdf.utils import scale_to_unit_sphere
 
@@ -35,6 +36,7 @@ def save_obj_with_color(v, f=None, c=None, file_name=''):
 
 
 def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_acronym_watertight_path):
+    # Watertight
     for each_h5_file in os.listdir(acronym_dataset_path):
         grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
         _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
@@ -43,31 +45,34 @@ def create_watertight_acronym(shapenetsem_path, acronym_watertight_path, simple_
         full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
         out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
         subprocess.call(["externals/Manifold/build/manifold", full_obj_file_path, out_file_path, "-s"])
-    for each_h5_file in os.listdir(acronym_dataset_path):
-        grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
-        _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
-        obj_file_name = obj_file_path.split('.obj')[0]
-        print(f'Processing {obj_file_name}....')
-        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
-        out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
-        out_simple_file_path = os.path.join(simple_acronym_watertight_path, obj_file_path)
-        subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
+    # # Simplify
+    # for each_h5_file in os.listdir(acronym_dataset_path):
+    #     grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
+    #     _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
+    #     obj_file_name = obj_file_path.split('.obj')[0]
+    #     print(f'Processing {obj_file_name}....')
+    #     full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+    #     out_file_path = os.path.join(acronym_watertight_path, obj_file_path)
+    #     out_simple_file_path = os.path.join(simple_acronym_watertight_path, obj_file_path)
+    #     subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
 
 
 def create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path):
+    # Watertight
     for obj_file_path in [f for f in os.listdir(shapenetsem_path) if '.obj' in f]:
         obj_file_name = obj_file_path.split('.obj')[0]
         print(f'Processing {obj_file_name}....')
         full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
         out_file_path = os.path.join(shapenet_watertight_path, obj_file_path)
         subprocess.call(["externals/Manifold/build/manifold", full_obj_file_path, out_file_path, "-s"])
-    for obj_file_path in [f for f in os.listdir(shapenetsem_path) if '.obj' in f]:
-        obj_file_name = obj_file_path.split('.obj')[0]
-        print(f'Processing {obj_file_name}....')
-        full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
-        out_file_path = os.path.join(shapenet_watertight_path, obj_file_path)
-        out_simple_file_path = os.path.join(simple_shapenet_watertight_path, obj_file_path)
-        subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
+    # # Simplify
+    # for obj_file_path in [f for f in os.listdir(shapenetsem_path) if '.obj' in f]:
+    #     obj_file_name = obj_file_path.split('.obj')[0]
+    #     print(f'Processing {obj_file_name}....')
+    #     full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
+    #     out_file_path = os.path.join(shapenet_watertight_path, obj_file_path)
+    #     out_simple_file_path = os.path.join(simple_shapenet_watertight_path, obj_file_path)
+    #     subprocess.call(["externals/Manifold/build/simplify", "-i", out_file_path, "-o", out_simple_file_path, "-m", "-r", "0.02"])
 
 
 def load_acronym_dataset(shapenetsem_path):
@@ -82,6 +87,7 @@ def load_acronym_dataset(shapenetsem_path):
         full_obj_file_path = os.path.join(shapenetsem_path, obj_file_path)
         watertight_obj_file_path = os.path.join('acronym-watertight', obj_file_path)
         # print('Caution!!! We are currently handling non-simplified watertight meshes!!!')
+        # each_h5_mesh = trimesh.load(watertight_obj_file_path, force='mesh', process=False)
         each_h5_mesh = trimesh.load(watertight_obj_file_path, force='mesh')
         # # Visualize
         # save_obj_with_color(v=each_h5_mesh.vertices, f=each_h5_mesh.faces, c=None, file_name='debug_mesh_h5.obj')
@@ -150,7 +156,18 @@ with open(splits_path) as f:
     splits = json.load(f)
 
 
+skip_rate = 4
+skip_turn = 3
+skip_count = 0
+
+target_mesh_list.reverse() ########## You can always delete this part ##########
+
 for each_target_mesh_dict in target_mesh_list:
+    if skip_count % skip_rate != skip_turn:
+        skip_count += 1
+        continue
+    else:
+        skip_count += 1
     # Extract sdf_data
     print("Extracting SDFs from our own datasets....")
     obj_name = each_target_mesh_dict['obj_name']
@@ -171,17 +188,14 @@ for each_target_mesh_dict in target_mesh_list:
     filtered_grid_gt_query_points = grid_gt_query_points[ext_grid_gt_sdf < 0] # optional for visualization purpose
 
 
-    # Visualization
-    print("Visualizing SDFs from our own datasets....")
-    sdf_data_colors = np.zeros(ext_points.shape)
-    sdf_data_colors[ext_sdf < 0, 2] = 1
-    sdf_data_colors[ext_sdf > 0, 0] = 1
-
-    grid_gt_colors = np.zeros(grid_gt_query_points.shape)
-    grid_gt_colors[ext_grid_gt_sdf < 0, 2] = 1
-    grid_gt_colors[ext_grid_gt_sdf > 0, 0] = 1
-
     # # Visualization
+    # print("Visualizing SDFs from our own datasets....")
+    # sdf_data_colors = np.zeros(ext_points.shape)
+    # sdf_data_colors[ext_sdf < 0, 2] = 1
+    # sdf_data_colors[ext_sdf > 0, 0] = 1
+    # grid_gt_colors = np.zeros(grid_gt_query_points.shape)
+    # grid_gt_colors[ext_grid_gt_sdf < 0, 2] = 1
+    # grid_gt_colors[ext_grid_gt_sdf > 0, 0] = 1
     # save_obj_with_color(v=mesh.vertices, f=mesh.faces, c=None, file_name='debug_mesh.obj')
     # save_obj_with_color(v=ext_points, f=None, c=sdf_data_colors, file_name='debug_pc.obj')
     # save_obj_with_color(v=grod_gt_coords, f=None, c=None, file_name='debug_grid_gt.obj')
@@ -194,5 +208,9 @@ for each_target_mesh_dict in target_mesh_list:
         os.makedirs(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name))
     if not os.path.exists(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name)):
         os.makedirs(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name))
-    np.savetxt(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name, "sdf_data.csv"), ext_sdf_data, delimiter=",")
-    np.savetxt(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name, "grid_gt.csv"), ext_grid_gt, delimiter=",")
+    # np.savetxt(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name, "sdf_data.csv"), ext_sdf_data, delimiter=",")
+    # np.savetxt(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name, "grid_gt.csv"), ext_grid_gt, delimiter=",")
+    ext_sdf_data = pd.DataFrame(ext_sdf_data)
+    ext_sdf_data.to_csv(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name, "sdf_data.csv"), header=False, index=False)
+    ext_grid_gt = pd.DataFrame(ext_grid_gt)
+    ext_grid_gt.to_csv(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name, "grid_gt.csv"), header=False, index=False)

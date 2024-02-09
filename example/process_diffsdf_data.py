@@ -4,6 +4,7 @@ import cv2
 import csv
 import json
 import h5py
+import time
 import trimesh
 import subprocess
 import numpy as np
@@ -16,7 +17,7 @@ sdf_data_path = 'diffsdf_data/acronym/Couch/37cfcafe606611d81246538126da07a8/sdf
 grid_gt_path = 'diffsdf_data/grid_data/acronym/Couch/37cfcafe606611d81246538126da07a8/grid_gt.csv'
 splits_path = 'diffsdf_data/splits/couch_all.json'
 target_obj_path = 'example/chair.obj'
-target_dataset = 'Acronym' # 'ShapeNetSem', 'Acronym', 'debug'
+target_dataset = 'Acronym' # 'ShapeNetSem', 'Acronym', 'ObMan', 'DexYCB', 'debug'
 acronym_dataset_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/acronym/grasps'
 create_watertight = False
 # save_path = ''
@@ -78,8 +79,8 @@ def create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simpl
 def load_acronym_dataset(shapenetsem_path):
     # returns list of trimesh files for Acronym objects
     acronym_mesh_list = []
-    for each_h5_file in os.listdir(acronym_dataset_path):
-    # for each_h5_file in [os.listdir(acronym_dataset_path)[0]]:
+    # for each_h5_file in os.listdir(acronym_dataset_path):
+    for each_h5_file in os.listdir(acronym_dataset_path)[:4000]:
         grasps = h5py.File(os.path.join(acronym_dataset_path, each_h5_file), 'r')
         _, obj_name, obj_file_path = grasps['object/file'][()].decode('utf-8').split('/')
         obj_file_name = obj_file_path.split('.obj')[0]
@@ -88,11 +89,22 @@ def load_acronym_dataset(shapenetsem_path):
         watertight_obj_file_path = os.path.join('acronym-watertight', obj_file_path)
         # print('Caution!!! We are currently handling non-simplified watertight meshes!!!')
         # each_h5_mesh = trimesh.load(watertight_obj_file_path, force='mesh', process=False)
-        each_h5_mesh = trimesh.load(watertight_obj_file_path, force='mesh')
         # # Visualize
         # save_obj_with_color(v=each_h5_mesh.vertices, f=each_h5_mesh.faces, c=None, file_name='debug_mesh_h5.obj')
-        acronym_mesh_list.append({'obj_name': obj_name, 'obj_file_name': obj_file_name, 'mesh': each_h5_mesh})
+        acronym_mesh_list.append({'obj_name': obj_name, 'obj_file_name': obj_file_name, 'obj_file_path': obj_file_path})
     return acronym_mesh_list
+
+
+def load_dexycb_dataset(dexycb_models_path):
+    # returns list of trimesh files for DexYCB objects
+    dexycb_mesh_list = []
+    for each_dexycb_model in os.listdir(dexycb_models_path):
+        obj_name = each_dexycb_model[4:]
+        obj_file_name = os.path.join(each_dexycb_model, 'textured')
+        obj_file_path = os.path.join(each_dexycb_model, 'textured.obj')
+        print(f'Processing {obj_file_name}....')
+        dexycb_mesh_list.append({'obj_name': obj_name, 'obj_file_name': obj_file_name, 'obj_file_path': obj_file_path})
+    return dexycb_mesh_list
 
 
 # Initialze path for dataset
@@ -104,6 +116,10 @@ elif target_dataset == 'ShapeNetSem':
     shapenetsem_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/ShapeNetSem/data/models-OBJ/models'
     shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight'
     simple_shapenet_watertight_path = '/mnt/disk1/danieljung0121/Hand2Object/models/Diffusion-SDF/datasets/shapenet-watertight_simplified'
+elif target_dataset == 'DexYCB':
+    dexycb_models_path = '/mnt/disk1/danieljung0121/Hand2Object/datasets/DexYCB/models'
+elif target_dataset == 'ObMan':
+    obman_models_path = '/mnt/disk1/danieljung0121/Hand2Object/datasets/DexYCB/models'
 elif target_dataset == 'debug':
     pass
 else:
@@ -118,6 +134,8 @@ if create_watertight is True:
     elif target_dataset == 'ShapeNetSem':
         print("Creating watertight dataset....")
         create_watertight_shapenet(shapenetsem_path, shapenet_watertight_path, simple_shapenet_watertight_path)
+    elif target_dataset == 'DexYCB': # already watertight
+        pass
     elif target_dataset == 'debug':
         pass
     else:
@@ -135,6 +153,9 @@ elif target_dataset == 'ShapeNetSem':
     print("Loading Acronym dataset....")
     # shapenetsem_mesh_list = load_shapenetsem_dataset(shapenetsem_path)
     # target_mesh_list = shapenetsem_mesh_list
+elif target_dataset == 'DexYCB':
+    dexycb_mesh_list = load_dexycb_dataset(dexycb_models_path)
+    target_mesh_list = dexycb_mesh_list
 elif target_dataset == 'debug':
     mesh = trimesh.load(target_obj_path)
     mesh_name = 'chair'
@@ -157,10 +178,9 @@ with open(splits_path) as f:
 
 
 skip_rate = 4
-skip_turn = 3
+skip_turn = 3 # Sever O running 0,1,2,3
 skip_count = 0
 
-target_mesh_list.reverse() ########## You can always delete this part ##########
 
 for each_target_mesh_dict in target_mesh_list:
     if skip_count % skip_rate != skip_turn:
@@ -169,23 +189,31 @@ for each_target_mesh_dict in target_mesh_list:
     else:
         skip_count += 1
     # Extract sdf_data
+    ext_sdf_start_time = time.time()
     print("Extracting SDFs from our own datasets....")
     obj_name = each_target_mesh_dict['obj_name']
     each_target_mesh_name = each_target_mesh_dict['obj_file_name']
-    mesh = each_target_mesh_dict['mesh']
+    obj_file_path = each_target_mesh_dict['obj_file_path']
+    if target_dataset == 'Acronym':
+        mesh = trimesh.load(os.path.join('acronym-watertight', obj_file_path), force='mesh')
+    elif target_dataset == 'DexYCB':
+        mesh = trimesh.load(os.path.join('dexycb-models', obj_file_path), force='mesh')
     try:
         ext_points, ext_sdf = sample_sdf_near_surface(mesh, number_of_points=len(sdf_data)) # points: [596000, 3], sdf: [596000]
     except ValueError: # array with 0 samples
         continue
     ext_sdf_data = np.concatenate([ext_points, ext_sdf[:, None]], axis=-1)
-    ext_voxels = mesh_to_voxels(mesh, 128, pad=False, sign_method='normal') ####### Changed from pad=True to pad=False
+    ext_voxels = mesh_to_voxels(mesh, 128, pad=False, sign_method='depth') ####### Changed from pad=True to pad=False
+    ext_sdf_end_time = time.time()
 
     # Extract grid_gt
+    ext_grid_start_time = time.time()
     grid_gt_query_points = grod_gt_coords
     mesh = scale_to_unit_sphere(mesh)
-    ext_grid_gt_sdf = mesh_to_sdf(mesh, grid_gt_query_points, surface_point_method='scan', sign_method='normal', bounding_radius=None, scan_count=100, scan_resolution=400, sample_point_count=10000000, normal_sample_count=11)
+    ext_grid_gt_sdf = mesh_to_sdf(mesh, grid_gt_query_points, surface_point_method='scan', sign_method='depth', bounding_radius=None, scan_count=100, scan_resolution=400, sample_point_count=10000000, normal_sample_count=11)
     ext_grid_gt = np.concatenate([grid_gt_query_points, ext_grid_gt_sdf[:, None]], axis=-1)
     filtered_grid_gt_query_points = grid_gt_query_points[ext_grid_gt_sdf < 0] # optional for visualization purpose
+    ext_grid_end_time = time.time()
 
 
     # # Visualization
@@ -204,6 +232,7 @@ for each_target_mesh_dict in target_mesh_list:
 
 
     # Save
+    save_start_time = time.time()
     if not os.path.exists(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name)):
         os.makedirs(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name))
     if not os.path.exists(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name)):
@@ -214,3 +243,8 @@ for each_target_mesh_dict in target_mesh_list:
     ext_sdf_data.to_csv(os.path.join("full_diffsdf_data", target_dataset.lower(), obj_name, each_target_mesh_name, "sdf_data.csv"), header=False, index=False)
     ext_grid_gt = pd.DataFrame(ext_grid_gt)
     ext_grid_gt.to_csv(os.path.join("full_diffsdf_data", "grid_data", target_dataset.lower(), obj_name, each_target_mesh_name, "grid_gt.csv"), header=False, index=False)
+    save_end_time = time.time()
+    
+    print('Extract sdf_data time is', str(ext_sdf_end_time - ext_sdf_start_time))
+    print('Extract grid_gt time is', str(ext_grid_end_time - ext_grid_start_time))
+    print('Save time is', str(save_end_time - save_start_time))

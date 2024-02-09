@@ -60,4 +60,6 @@ def render_normal_and_depth_buffers(mesh, camera, camera_transform, resolution):
 
     color, depth = renderer.render(scene, flags=pyrender.RenderFlags.SKIP_CULL_FACES)
     suppress_multisampling = False
+    del scene
+    del renderer
     return color, depth

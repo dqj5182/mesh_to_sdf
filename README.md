@@ -6,7 +6,7 @@ It works for **non-watertight** meshes (meshes with holes), **self-intersecting*
 ## Install
 
 ```
-pip3 install mesh-to-sdf
+pip install git+https://github.com/marian42/mesh_to_sdf.git
 ```
 
 If you're using Windows or Mac, you need to work around a bug in pyrender.
